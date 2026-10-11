@@ -197,6 +197,15 @@ input[type=range]{width:140px;touch-action:auto}
 </div>
 <div id="toast"></div>
 <script>
+/* GA4 custom events (Games by Zaib). Safe: never throws, light (no per-frame calls, dedupe + per-page cap). */
+var ZT_N = 0, ZT_K = '', ZT_KT = 0, ZT_T = 0, ZT_S = 0, ZT_H = 0;
+function zt(n, p) { try { var k = n + JSON.stringify(p || 0), t = Date.now(); if (ZT_N > 150 || (k === ZT_K && t - ZT_KT < 500)) return; ZT_N++; ZT_K = k; ZT_KT = t; window.gtag && gtag('event', n, Object.assign({ game_id: 'moto-mayhem' }, p)); } catch (e) {} }
+function ztPlay(on) { try { var t = Date.now(); if (ZT_S) { ZT_T += (t - ZT_S) / 1e3; ZT_S = 0; } if (on) ZT_S = t; } catch (e) {} }
+function ztPing(r) { try { ztPlay(false); if (ZT_T >= 1) zt('play_time', { play_time: Math.round(ZT_T), reason: r }); ZT_T = 0; } catch (e) {} }
+try {
+  document.addEventListener('visibilitychange', function () { if (document.hidden) { ZT_H = !!ZT_S; ztPing('page_hide'); } else if (ZT_H) { ZT_H = 0; ztPlay(true); } });
+  document.addEventListener('click', function (e) { try { var a = e.target && e.target.closest && e.target.closest('a[href]'); if (!a) return; var u = new URL(a.href, location.href); if (!/^https?:$/.test(u.protocol)) return; if (u.host === location.host || /(^|\.)zaibgames\.com$/.test(u.host)) { if (u.pathname.indexOf('/moto-mayhem/') !== 0) zt('more_games_click', { link_url: u.href }); } else zt('outbound_click', { link_url: u.href, link_domain: u.host, outbound: true }); } catch (err) {} }, true);
+} catch (e) {}
 'use strict';
 // ===================== MOTO MAYHEM =====================
 const $ = s => document.querySelector(s);
@@ -882,6 +891,7 @@ function startRace(L) {
   raceTime = 0; countdown = 3.99; kos = 0; cashGot = 0; endTimer = 0; endReason = ''; particles = []; messages = []; shake = 0; flash = 0; livePlace = 8; targetRival = null;
   lastCount = 4; bgOffset = 0;
   state = 'countdown';
+  zt('game_start', { mode: 'career', level: L + 1 }); zt('level_start', { level: L + 1, level_name: LEVELS[L].name }); ztPlay(true);
   MUS.mode = 'race' + (L % 3);
   showScreen(null); $('#hud').classList.remove('hidden'); updatePunchLabel(); applyVolumes();
   if (save.settings.steer === 'tilt') msg('TILT TO STEER', '#fff', 2.5); else if (save.settings.steer === 'drag') msg('SLIDE TO STEER', '#fff', 2.5); else msg('HOLD LEFT / RIGHT TO STEER', '#fff', 2.5);
@@ -996,6 +1006,10 @@ function crashPlayer(what) {
 function endRace(reason) {
   if (state !== 'race') return;
   endReason = reason; endTimer = 2.6;
+  try { const pl = reason === 'finish' ? 1 + rivals.filter(r => r.finished).length : 0;
+    zt('level_end', { level: level + 1, level_name: LEVELS[level].name, success: reason === 'finish' && pl <= 3, place: pl, result: reason, knockouts: kos });
+    if (reason !== 'finish') zt('game_over', { score: Math.round(cashGot), level: level + 1, result: reason });
+    ztPing('race_end'); } catch (e) { }
   if (reason === 'finish') { state = 'finished'; P.place = 1 + rivals.filter(r => r.finished).length; P.finishTime = raceTime; sfx('finish'); msg(ordinal(P.place) + ' PLACE!', '#ffd23f', 2.5, true); }
   else { state = 'over'; sfx('fail'); msg(reason === 'busted' ? 'BUSTED!' : 'BIKE WRECKED!', '#ff5c5c', 2.5, true); }
 }
@@ -1424,7 +1438,7 @@ function buildShop() {
       if (save.bike === i) { btn.textContent = 'RIDING'; btn.disabled = true; btn.classList.add('alt'); }
       else if (save.owned[i]) { btn.textContent = 'RIDE'; btn.onclick = () => { save.bike = i; writeSave(); buildShop(); }; }
       else { btn.textContent = money(b.price); btn.classList.add('gold'); if (save.money < b.price) btn.disabled = true;
-        btn.onclick = () => { if (save.money >= b.price) { save.money -= b.price; save.owned[i] = true; save.bike = i; writeSave(); sfx('coin'); toast(b.name + ' purchased!'); buildShop(); } }; }
+        btn.onclick = () => { if (save.money >= b.price) { save.money -= b.price; save.owned[i] = true; zt('spend_virtual_currency', { virtual_currency_name: 'coins', value: b.price, item_name: b.name }); save.bike = i; writeSave(); sfx('coin'); toast(b.name + ' purchased!'); buildShop(); } }; }
       d.appendChild(btn); list.appendChild(d);
     });
   } else {
@@ -1435,7 +1449,7 @@ function buildShop() {
       const btn = document.createElement('button'); btn.className = 'btn small gold';
       if (lvl >= 3) { btn.textContent = 'MAX'; btn.disabled = true; }
       else { btn.textContent = money(cost); if (save.money < cost) btn.disabled = true;
-        btn.onclick = () => { if (save.money >= cost && save.up[u.key] < 3) { save.money -= cost; save.up[u.key]++; writeSave(); sfx('coin'); buildShop(); } }; }
+        btn.onclick = () => { if (save.money >= cost && save.up[u.key] < 3) { save.money -= cost; save.up[u.key]++; zt('spend_virtual_currency', { virtual_currency_name: 'coins', value: cost, item_name: u.name + ' ' + save.up[u.key] }); writeSave(); sfx('coin'); buildShop(); } }; }
       d.appendChild(btn); list.appendChild(d);
     });
     const n = document.createElement('div'); n.className = 'sub'; n.style.textAlign = 'center'; n.style.color = '#aab'; n.textContent = 'Upgrades apply to every bike you own.'; list.appendChild(n);
@@ -1451,7 +1465,7 @@ function syncSettings() {
   $('#tiltRow').style.display = $('#tiltCal').style.display = s.steer === 'tilt' ? '' : 'none';
   $('#btnReset').textContent = 'Reset progress'; resetArm = false;
 }
-for (const b of $$('[data-set]')) b.addEventListener('click', () => { save.settings[b.dataset.set] = b.dataset.v === '1'; writeSave(); applyVolumes(); syncSettings(); });
+for (const b of $$('[data-set]')) b.addEventListener('click', () => { save.settings[b.dataset.set] = b.dataset.v === '1'; zt('settings_change', { setting: b.dataset.set, value: b.dataset.v }); writeSave(); applyVolumes(); syncSettings(); });
 for (const b of $$('[data-steer]')) b.addEventListener('click', async () => {
   const m = b.dataset.steer;
   if (m === 'tilt') {
@@ -1464,6 +1478,7 @@ for (const b of $$('[data-steer]')) b.addEventListener('click', async () => {
       toast('Tilt enabled. Hold phone how you like to ride, then Calibrate.');
     } catch (err) { toast('Tilt permission denied. Using touch.'); save.settings.steer = 'touch'; }
   } else save.settings.steer = m;
+  zt('settings_change', { setting: 'steer', value: save.settings.steer });
   writeSave(); syncSettings();
 });
 $('#tiltSens').addEventListener('input', e => { save.settings.tiltSens = +e.target.value; writeSave(); });
@@ -1497,10 +1512,10 @@ function showResults() {
     $('#resPlace').textContent = ordinal(P.place) + ' PLACE';
     $('#resSub').textContent = lv.name + ' · ' + fmtTime(P.finishTime);
     if (!save.best[level] || P.place < save.best[level]) save.best[level] = P.place;
-    if (!save.bestTime[level] || P.finishTime < save.bestTime[level]) save.bestTime[level] = P.finishTime;
+    if (!save.bestTime[level] || P.finishTime < save.bestTime[level]) { save.bestTime[level] = P.finishTime; zt('post_score', { score: total, level: level + 1, character: BIKES[save.bike].name, finish_time: Math.round(P.finishTime * 10) / 10 }); }
     if (P.place <= 3) {
-      if (level === save.unlocked - 1 && level < LEVELS.length - 1) { save.unlocked++; note = '🔓 Unlocked: ' + LEVELS[level + 1].name + '!'; }
-      if (level === LEVELS.length - 1 && P.place === 1) { save.champion = true; note = '🏆 CHAMPION OF THE ROAD! 🏆'; }
+      if (level === save.unlocked - 1 && level < LEVELS.length - 1) { save.unlocked++; zt('unlock_achievement', { achievement_id: 'track_' + (level + 2) }); note = '🔓 Unlocked: ' + LEVELS[level + 1].name + '!'; }
+      if (level === LEVELS.length - 1 && P.place === 1) { save.champion = true; zt('unlock_achievement', { achievement_id: 'champion' }); note = '🏆 CHAMPION OF THE ROAD! 🏆'; }
     } else note = 'Finish top 3 to unlock the next track.';
   } else {
     const fee = Math.round((endReason === 'busted' ? 600 : 350) * lv.mult);
@@ -1511,6 +1526,8 @@ function showResults() {
     note = 'Tip: upgrade Armor in the Garage.';
   }
   save.money = Math.max(0, save.money + total);
+  if (total > 0) zt('earn_virtual_currency', { virtual_currency_name: 'coins', value: total, item_name: endReason === 'finish' ? 'race_prize' : 'knockouts' });
+  else if (total < 0) zt('spend_virtual_currency', { virtual_currency_name: 'coins', value: -total, item_name: endReason === 'busted' ? 'police_fine' : 'bike_repair' });
   writeSave();
   $('#resLines').innerHTML = lines.map(l => `<div class="res-line"><span>${l[0]}</span><span>${l[1]}</span></div>`).join('') +
     `<div class="res-line tot"><span>Total</span><span>${total < 0 ? '-' : '+'}${money(Math.abs(total))}</span></div><div class="res-line"><span>Bank</span><span>${money(save.money)}</span></div>`;
