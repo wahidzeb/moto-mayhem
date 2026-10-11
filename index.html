@@ -559,8 +559,15 @@ function drawRider(o, x, y, s) {
   }
   // helmet
   circle(0, -664, 80, o.helmet);
-  ctx.fillStyle = o.hstripe || 'rgba(255,255,255,.35)'; ctx.fillRect(-13, -740, 26, 150);
+  if (o.visor) { // darker visor edge peeking out around the sides of the helmet
+    ctx.save(); ctx.beginPath(); ctx.arc(0, -664, 80, 0, Math.PI * 2); ctx.clip();
+    ctx.fillStyle = o.visor; ctx.beginPath(); ctx.ellipse(0, -628, 96, 26, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.3)'; ctx.fillRect(-80, -650, 160, 5);
+    ctx.restore();
+  }
+  ctx.fillStyle = o.hstripe || 'rgba(255,255,255,.35)'; ctx.fillRect(-13, -740, 26, o.visor ? 86 : 150);
   ctx.fillStyle = 'rgba(255,255,255,.25)'; ctx.beginPath(); ctx.arc(-24, -694, 30, 0, 7); ctx.fill();
+  if (o.visor) { ctx.fillStyle = 'rgba(255,255,255,.75)'; ctx.beginPath(); ctx.ellipse(-36, -708, 16, 9, -0.6, 0, Math.PI * 2); ctx.fill(); }
   ctx.restore();
 }
 function drawCrash(o) {
@@ -576,6 +583,7 @@ function drawCrash(o) {
   line([-70, -110, -200, -40], o.jacket, 44); line([70, -110, 190, -170], o.jacket, 44);
   poly([-80, 50, 80, 50, 95, -140, -95, -140], o.jacket);
   circle(0, -205, 72, o.helmet);
+  if (o.visor) { ctx.fillStyle = o.visor; ctx.beginPath(); ctx.arc(0, -205, 72, 0.15, 1.45); ctx.lineTo(0, -205); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.beginPath(); ctx.arc(-26, -232, 13, 0, Math.PI * 2); ctx.fill(); }
   ctx.restore();
   if (o.crashed > 0.6 && o.crashed < o.crashMax - 0.8) for (let i = 0; i < 3; i++) { const an = T * 4 + i * 2.1; text('★', rx + Math.cos(an) * 120, -330 + Math.sin(an) * 35, 70, '#ffe14d', 'center'); }
 }
@@ -842,6 +850,8 @@ let raceTime = 0, countdown = 0, kos = 0, cashGot = 0, endTimer = 0, endReason =
 let particles = [], messages = [], shake = 0, flash = 0, livePlace = 8, demoPos = 0, demoLevel = 0, ST = null;
 let targetRival = null, targetTimer = 0, lastHitBy = null;
 
+// player's helmet: bright yellow with a darker visor and a shine (rivals keep their own colours)
+const PLAYER_HELMET = { helmet: '#ffd60a', hstripe: '#e0a800', visor: '#3a2a00' };
 function makeRider(def, i, L) {
   const lv = LEVELS[L];
   const skill = (7 - i) / 7;
@@ -857,7 +867,7 @@ function startRace(L) {
   ST = stats();
   position = 0;
   P = { x: 0.4, speed: 0, steer: 0, lean: 0, health: ST.maxHealth, bk: ST.maxBike, crashed: 0, crashMax: 1, crashSide: 1, inv: 0, atk: null, cd: 0,
-    weapon: false, nitro: 0, braking: false, tally: {}, jacket: '#1f2a44', helmet: '#f5f5f5', hstripe: '#e63946', bike: ST.color, pants: '#1a1d2b', stripe: '#ffd23f', seed: 0 };
+    weapon: false, nitro: 0, braking: false, tally: {}, jacket: '#1f2a44', ...PLAYER_HELMET, bike: ST.color, pants: '#1a1d2b', stripe: '#ffd23f', seed: 0 };
   P.bikeColor = ST.color;
   // rivals on grid
   const defs = RIVAL_DEF.slice().sort(() => Math.random() - 0.5).slice(0, 7);
@@ -1392,7 +1402,7 @@ function bikePreview(i) {
   const c = document.createElement('canvas'); const s = 64; c.width = s * 2; c.height = s * 2; c.style.width = s + 'px'; c.style.height = s + 'px'; c.style.flex = 'none';
   c.style.background = 'rgba(255,255,255,.06)'; c.style.borderRadius = '12px';
   const saved = ctx; ctx = c.getContext('2d'); ctx.setTransform(2, 0, 0, 2, 0, 0);
-  drawRider({ bike: BIKES[i].color, jacket: '#1f2a44', helmet: '#f5f5f5', hstripe: '#e63946', stripe: '#ffd23f', pants: '#1a1d2b', lean: 0, speed: 0, crashed: 0 }, s / 2, s - 4, (s - 8) / 760);
+  drawRider({ bike: BIKES[i].color, jacket: '#1f2a44', ...PLAYER_HELMET, stripe: '#ffd23f', pants: '#1a1d2b', lean: 0, speed: 0, crashed: 0 }, s / 2, s - 4, (s - 8) / 760);
   ctx = saved; return c;
 }
 function buildShop() {
